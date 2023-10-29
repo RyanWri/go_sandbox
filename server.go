@@ -11,7 +11,15 @@ import (
     "strconv"
 )
 
-func sendEmailHandler(c *fiber.Ctx) error {
+// Field names should start with an uppercase letter
+type ContactFormDetails struct {
+    Name string `json:"name" xml:"name" form:"name"`
+    Email string `json:"email" xml:"email" form:"email"`
+    Message string `json:"message" xml:"message" form:"message"`
+}
+
+
+func sendEmailHandler(c *fiber.Ctx) error {    
     err := godotenv.Load()
     if err != nil {
         log.Fatal("Error loading .env file")
@@ -20,11 +28,15 @@ func sendEmailHandler(c *fiber.Ctx) error {
     smtpUsername := os.Getenv("SMTP_USERNAME")
     smtpPassword := os.Getenv("SMTP_APP_PASSWORD")
 
+    contactForm := new(ContactFormDetails)
+    if bodyErr := c.BodyParser(contactForm); bodyErr != nil {
+        return bodyErr
+    }
+
     // Get the fields from the request
-    name := c.FormValue("name")
-    email := c.FormValue("email")
-    message := c.FormValue("message")
-    log.Println(name, email, message)
+    name := contactForm.Name
+    email := contactForm.Email
+    message := contactForm.Message
 
     // Create the email message
     from := mail.Address{Name: name, Address: email}
