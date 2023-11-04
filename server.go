@@ -4,11 +4,13 @@ import (
     "github.com/gofiber/fiber/v2"
     "github.com/joho/godotenv"
 
+    "fmt"
     "log"
     "os"
     "net/smtp"
     "net/mail"
     "strconv"
+    "strings"
 )
 
 // Field names should start with an uppercase letter
@@ -18,6 +20,17 @@ type ContactFormDetails struct {
     Message string `json:"message" xml:"message" form:"message"`
 }
 
+
+func checkEmailServer(domain string) error {
+	// Set up SMTP client
+	smtpAddr := fmt.Sprintf("%s:25", domain)
+	smtpClient, err := smtp.Dial(smtpAddr)
+	if err != nil {
+		return err
+	}
+	defer smtpClient.Close()
+    return nil
+}
 
 func sendEmailHandler(c *fiber.Ctx) error {    
     err := godotenv.Load()
@@ -48,23 +61,29 @@ func sendEmailHandler(c *fiber.Ctx) error {
     smtpServer := "smtp.gmail.com"
     smtpPort := 587
     
-    // Connect to the SMTP server
-	auth := smtp.PlainAuth("", smtpUsername, smtpPassword, smtpServer)
-	toAddr := []string{to.Address}
-	msg := []byte("To: " + to.String() + "\r\n" +
-		"From: " + from.String() + "\r\n" +
-		"Subject: " + subject + "\r\n" +
-		"\r\n" +
-		body + "\r\n")
+    domain := strings.Split(email, "@")[1]
+    mail_err := checkEmailServer(domain) 
+    if mail_err != nil {
+        // email server failed, domain does not exist
+        return c.Status(fiber.StatusInternalServerError).SendString(mail_err.Error())
+    } else {
+        // Connect to the SMTP server
+        auth := smtp.PlainAuth("", smtpUsername, smtpPassword, smtpServer)
+        toAddr := []string{to.Address}
+        msg := []byte("To: " + to.String() + "\r\n" +
+            "From: " + from.String() + "\r\n" +
+            "Subject: " + subject + "\r\n" +
+            "\r\n" +
+            body + "\r\n")
 
-	smtpErr := smtp.SendMail(smtpServer+":"+strconv.Itoa(smtpPort), auth, from.Address, toAddr, msg)
-	if smtpErr != nil {
-        // Handle the error
-        log.Println("Failed to send email:", smtpErr)
-		return smtpErr
-	}
-
-	return c.SendStatus(fiber.StatusOK)
+        smtpErr := smtp.SendMail(smtpServer+":"+strconv.Itoa(smtpPort), auth, from.Address, toAddr, msg)
+        if smtpErr != nil {
+            // Handle the error
+            log.Println("Failed to send email:", smtpErr)
+            return smtpErr        
+	    }
+        return c.SendStatus(fiber.StatusOK)
+    }
 }
 
 
